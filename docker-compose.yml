@@ -1,0 +1,38 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: visco-cae-service:latest
+    container_name: visco-cae-app
+    environment:
+      # 服务名 mongo 由 compose 网络解析
+      MONGO_URI: mongodb://mongo:27017/visco_cae
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    container_name: visco-cae-mongo
+    restart: unless-stopped
+    # MongoDB 7 对老旧 CPU 需要 avx；命名卷持久化数据
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  mongo-data:
+    name: visco-cae-mongo-data
