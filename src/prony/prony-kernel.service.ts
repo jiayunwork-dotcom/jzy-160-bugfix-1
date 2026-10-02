@@ -190,26 +190,70 @@ function relaxationAt(
   return e;
 }
 
-/** 合并控制点与输出时刻（去重、严格递增）。 */
-function buildBreakpoints(history: ResolvedHistory): number[] {
-  const points: number[] = [];
-  const add = (t: number): void => {
-    const tol = DEDUP_EPS * Math.max(1, Math.abs(t));
-    for (const existing of points) {
-      if (Math.abs(existing - t) <= tol) return;
-    }
-    points.push(t);
-  };
+/**
+ * 合并控制点与输出时刻（去重、严格递增）。
+ *
+ * 去重规则与朴素 O(n²) 实现逐点等价：候选点按加入顺序（控制点先于输出
+ * 时刻）处理，凡与某个已保留点相差不超过 tol = DEDUP_EPS·max(1,|t|)
+ * （tol 按候选点取值）即丢弃。这里利用输入本身有序做加速：
+ * - 控制点按历程推进顺序非递减（拼接点可能原值重复）：每个候选只需与
+ *   最近一个已保留控制点比较，更早的只会更远；
+ * - 输出时刻严格递增：与已保留输出时刻的比较同理；与已保留控制点的
+ *   比较用二分查找定位前驱/后继后扫描 tol 窗口。
+ * 断点集合与顺序不变，内核数值逐位一致；复杂度 O(n log n)。
+ *
+ * 导出仅供差分测试（与朴素 O(n²) 参考实现逐点对比），内核外部不应使用。
+ */
+export function buildBreakpoints(history: ResolvedHistory): number[] {
+  const control: number[] = [];
   for (const seg of history.segments) {
     if (seg.type === 'linear') {
-      for (const t of seg.times) add(t);
+      for (const t of seg.times) control.push(t);
     } else {
-      add(seg.t0);
-      add(seg.t0 + seg.duration);
+      control.push(seg.t0, seg.t0 + seg.duration);
     }
   }
-  for (const t of history.outputTimes) add(t);
-  return points.sort((a, b) => a - b);
+
+  const keptControl: number[] = [];
+  for (const t of control) {
+    if (!withinTol(keptControl[keptControl.length - 1], t)) keptControl.push(t);
+  }
+
+  const keptOutput: number[] = [];
+  for (const t of history.outputTimes) {
+    if (withinTol(keptOutput[keptOutput.length - 1], t)) continue;
+    if (hasNeighborWithinTol(keptControl, t)) continue;
+    keptOutput.push(t);
+  }
+
+  return keptControl.concat(keptOutput).sort((a, b) => a - b);
+}
+
+/** t 是否与已保留点 existing 相差不超过 tol（tol 按候选点 t 取值）。 */
+function withinTol(existing: number | undefined, t: number): boolean {
+  if (existing === undefined) return false;
+  const tol = DEDUP_EPS * Math.max(1, Math.abs(t));
+  return Math.abs(existing - t) <= tol;
+}
+
+/** 在已排序数组中，是否存在与 t 相差不超过 tol(t) 的元素（二分定位后扫描窗口）。 */
+function hasNeighborWithinTol(sorted: number[], t: number): boolean {
+  const tol = DEDUP_EPS * Math.max(1, Math.abs(t));
+  let lo = 0;
+  let hi = sorted.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] <= t) lo = mid + 1;
+    else hi = mid;
+  }
+  // 窗口 [t−tol, t+tol] 内的元素是插入位置附近的连续段，向两侧扫描
+  for (let i = lo - 1; i >= 0 && sorted[i] >= t - tol; i--) {
+    if (Math.abs(sorted[i] - t) <= tol) return true;
+  }
+  for (let i = lo; i < sorted.length && sorted[i] <= t + tol; i++) {
+    if (Math.abs(sorted[i] - t) <= tol) return true;
+  }
+  return false;
 }
 
 /** 定位覆盖区间 [t0,t1] 的段；断点取自段边界与输出点，区间整体落在唯一段内。 */

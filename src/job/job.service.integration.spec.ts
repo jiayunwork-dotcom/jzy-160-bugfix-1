@@ -9,6 +9,7 @@ import { MaterialService } from '../material/material.service';
 import { JobService } from './job.service';
 import { MaterialDocumentDefinition, MaterialSchema } from '../persistence/material.schema';
 import { JobDocumentDefinition, JobSchema } from '../persistence/job.schema';
+import { JobResultDocumentDefinition, JobResultSchema } from '../persistence/job-result.schema';
 import { StrainHistorySpec } from '../history/history.model';
 
 /**
@@ -38,6 +39,7 @@ describe('JobService（内存 MongoDB 集成）', () => {
         MongooseModule.forFeature([
           { name: MaterialDocumentDefinition.name, schema: MaterialSchema },
           { name: JobDocumentDefinition.name, schema: JobSchema },
+          { name: JobResultDocumentDefinition.name, schema: JobResultSchema },
         ]),
       ],
       providers: [MaterialService, JobService],
