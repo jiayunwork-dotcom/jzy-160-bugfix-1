@@ -17,6 +17,8 @@ export type ViscoErrorCode =
   | 'OUTPUT_GRID_NOT_INCREASING'
   | 'OUTPUT_GRID_OUT_OF_RANGE'
   | 'JOB_EMPTY'
+  | 'RESULT_PERSISTENCE_FAILED'
+  | 'JOB_EXECUTION_FAILED'
   | 'INVALID_PAYLOAD';
 
 export class ViscoError extends Error {

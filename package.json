@@ -11,7 +11,8 @@
     "start:prod": "node dist/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "test:real-mongo": "jest src/job/job.real-mongo.spec.ts --runInBand"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

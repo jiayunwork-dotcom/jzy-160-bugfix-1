@@ -1,56 +1,29 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
 
-/** 单条历程结果在作业文档中的内嵌结构。 */
+/**
+ * 单条历程在作业文档中的“状态行”。
+ *
+ * 只承载小字段（名字、状态、失败原因与下标）。曲线数组（times/strains/
+ * stresses/relaxationModulus/dynamics/shiftFactor）拆到独立集合
+ * job_history_results，见 job-history-result.schema.ts 与 README「结果存储」。
+ *
+ * 升级前写入的旧文档里仍带有内嵌曲线字段；读取使用 lean() 取原始数据，
+ * 旧字段不会被剥离，getDetail 会与新集合结果合并，因此旧作业完整兼容。
+ */
 @Schema({ _id: false })
 export class HistoryResultModel {
+  /** 该历程在作业中的下标（执行器原子更新状态时按它定位）。 */
+  @Prop({ type: Number, required: true })
+  index!: number;
+
   @Prop()
   name?: string;
 
   @Prop({ required: true, default: 'pending' })
   status!: 'pending' | 'succeeded' | 'failed';
 
-  // 成功时的结果
-  @Prop({ type: [Number], default: [] })
-  times!: number[];
-
-  @Prop({ type: [Number], default: [] })
-  strains!: number[];
-
-  @Prop({ type: [Number], default: [] })
-  stresses!: number[];
-
-  @Prop({ type: [Number], default: [] })
-  relaxationModulus!: number[];
-
-  /** 各正弦稳态段的解析动态模量（按段顺序） */
-  @Prop({
-    type: [
-      {
-        frequency: Number,
-        omega: Number,
-        storageModulus: Number,
-        lossModulus: Number,
-        lossTangent: Number,
-        complexMagnitude: Number,
-      },
-    ],
-    _id: false,
-    default: [],
-  })
-  dynamics!: {
-    frequency: number;
-    omega: number;
-    storageModulus: number;
-    lossModulus: number;
-    lossTangent: number;
-    complexMagnitude: number;
-  }[];
-
-  @Prop({ default: 1 })
-  shiftFactor!: number;
-
-  // 失败时的原因
+  // 失败时的原因（成功时不输出这两个字段）
   @Prop()
   errorCode?: string;
 

@@ -268,3 +268,42 @@ describe('Prony 内核：正弦段与正弦拼接', () => {
     expect(Number.isFinite(result.stresses[60])).toBe(true);
   });
 });
+
+describe('Prony 内核：大输出网格性能（断点合并不能是 O(n²)）', () => {
+  const material = makeMaterial(
+    { eInf: 3 },
+    [
+      { modulus: 4, tau: 0.1 },
+      { modulus: 6, tau: 10 },
+    ],
+  );
+
+  test('30000 点阶跃保持在秒级以内完成（旧 O(n²) 去重需数十秒）', () => {
+    const spec = stepHoldSpec(0.1, 100, 30000);
+    const started = Date.now();
+    const { result } = runSpec(material, spec);
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(result.times).toHaveLength(30000);
+    // 数值不变：σ(0)=E0·ε0、σ(t)=E(t)·ε0、长时趋 E∞·ε0
+    expect(result.stresses[0]).toBeCloseTo(1.3, 12);
+    const sigmaEnd = 0.1 * (3 + 4 * Math.exp(-1000) + 6 * Math.exp(-10));
+    expect(result.stresses.at(-1)).toBeCloseTo(sigmaEnd, 10);
+  });
+
+  test('输出网格与控制点重合/穿插时结果仍严格对应各输出时刻', () => {
+    // 控制点 0、100 与 30001 个输出点（含边界）合并后不丢点、不乱序
+    const spec: StrainHistorySpec = {
+      ...stepHoldSpec(0.1, 100, 30001),
+    };
+    const { history, result } = runSpec(material, spec);
+    expect(result.times).toHaveLength(30001);
+    expect(result.times[0]).toBe(0);
+    expect(result.times.at(-1)).toBeCloseTo(100, 9);
+    for (let i = 1; i < result.times.length; i++) {
+      expect(result.times[i]).toBeGreaterThan(result.times[i - 1]);
+      expect(Number.isFinite(result.stresses[i])).toBe(true);
+      expect(result.stresses[i]).toBeCloseTo(0.1 * result.relaxationModulus[i], 9);
+    }
+    expect(history.outputTimes).toHaveLength(30001);
+  });
+});

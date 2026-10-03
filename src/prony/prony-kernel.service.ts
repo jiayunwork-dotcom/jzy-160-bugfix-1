@@ -190,26 +190,37 @@ function relaxationAt(
   return e;
 }
 
-/** 合并控制点与输出时刻（去重、严格递增）。 */
+/**
+ * 合并控制点与输出时间点（去重、严格递增）。
+ *
+ * 先汇总再排序、按相对容差顺序去重：O(n log n)。
+ * 旧实现每加一个点都线性扫描已有断点，是 O(n²)，30000 点输出网格下
+ * 仅去重就要数千万次比较（数十秒）。数值容差与旧实现完全一致，
+ * 去重后断点序列相同，因此计算结果不变。
+ */
 function buildBreakpoints(history: ResolvedHistory): number[] {
   const points: number[] = [];
-  const add = (t: number): void => {
-    const tol = DEDUP_EPS * Math.max(1, Math.abs(t));
-    for (const existing of points) {
-      if (Math.abs(existing - t) <= tol) return;
-    }
-    points.push(t);
-  };
   for (const seg of history.segments) {
     if (seg.type === 'linear') {
-      for (const t of seg.times) add(t);
+      for (const t of seg.times) points.push(t);
     } else {
-      add(seg.t0);
-      add(seg.t0 + seg.duration);
+      points.push(seg.t0);
+      points.push(seg.t0 + seg.duration);
     }
   }
-  for (const t of history.outputTimes) add(t);
-  return points.sort((a, b) => a - b);
+  for (const t of history.outputTimes) points.push(t);
+
+  points.sort((a, b) => a - b);
+
+  const unique: number[] = [];
+  for (const t of points) {
+    const last = unique[unique.length - 1];
+    const tol = DEDUP_EPS * Math.max(1, Math.abs(t));
+    if (last === undefined || Math.abs(t - last) > tol) {
+      unique.push(t);
+    }
+  }
+  return unique;
 }
 
 /** 定位覆盖区间 [t0,t1] 的段；断点取自段边界与输出点，区间整体落在唯一段内。 */

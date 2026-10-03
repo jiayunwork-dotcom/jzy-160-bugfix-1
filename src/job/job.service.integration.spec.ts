@@ -9,6 +9,10 @@ import { MaterialService } from '../material/material.service';
 import { JobService } from './job.service';
 import { MaterialDocumentDefinition, MaterialSchema } from '../persistence/material.schema';
 import { JobDocumentDefinition, JobSchema } from '../persistence/job.schema';
+import {
+  JobHistoryResultDefinition,
+  JobHistoryResultSchema,
+} from '../persistence/job-history-result.schema';
 import { StrainHistorySpec } from '../history/history.model';
 
 /**
@@ -38,6 +42,7 @@ describe('JobService（内存 MongoDB 集成）', () => {
         MongooseModule.forFeature([
           { name: MaterialDocumentDefinition.name, schema: MaterialSchema },
           { name: JobDocumentDefinition.name, schema: JobSchema },
+          { name: JobHistoryResultDefinition.name, schema: JobHistoryResultSchema },
         ]),
       ],
       providers: [MaterialService, JobService],
@@ -58,6 +63,7 @@ describe('JobService（内存 MongoDB 集成）', () => {
     const conn = app.get<Connection>(getConnectionToken());
     await conn.collection('materials').deleteMany({});
     await conn.collection('jobs').deleteMany({});
+    await conn.collection('job_history_results').deleteMany({});
   });
 
   const goodStep = (name: string): StrainHistorySpec => ({
